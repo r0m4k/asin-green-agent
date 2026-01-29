@@ -1,0 +1,19 @@
+{
+  "name": "asin_green_agent",
+  "description": "ASIN (Assessment of Spatial Intelligence for Navigation) green agent benchmark: evaluates map+street-view navigation in Manhattan, NYC.",
+  "url": "http://localhost:9009/",
+  "version": "1.0.0",
+  "default_input_modes": ["text"],
+  "default_output_modes": ["text"],
+  "capabilities": { "streaming": true },
+  "skills": [
+    {
+      "id": "asin_benchmark",
+      "name": "ASIN Benchmark",
+      "description": "Orchestrates ASIN navigation evaluation and produces per-task scores.",
+      "tags": ["asin", "benchmark", "spatial_navigation"],
+      "examples": []
+    }
+  ]
+}
+
