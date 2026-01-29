@@ -17,7 +17,7 @@ The Purple agent must issue navigation actions (`f`, `l <deg>`, `r <deg>`, `q`) 
 
 ---
 
-## Levels, determinism, and task selection
+## Levels, determinism
 
 This benchmark has **10 levels** configured in `src/utils.py` (`LEVEL_CONFIG`).
 
@@ -25,20 +25,6 @@ This benchmark has **10 levels** configured in `src/utils.py` (`LEVEL_CONFIG`).
 - The evaluator uses a deterministic seed per level:
   - `seed = 1000 + level`
 - The **evaluation route polyline is truncated** to match `LEVEL_CONFIG[level]["dist"]` **exactly** (so Level distances align by construction).
-
-### How to select a level (critical for reproducibility)
-
-The server chooses the level from `task_config`:
-
-- If `task_config` is a dict, it supports:
-  - `{"level": 1..10}` (preferred)
-  - `{"task_index": 0..9}` / `{"index": 0..9}`
-- If `task_config` is a string (common in AgentBeats), it supports:
-  - `"0"` .. `"9"` (interpreted as task index → level = index + 1)
-  - `"Task description: 0"` .. `"Task description: 9"` (same behavior)
-  - strings containing the word `level` like `"level 3"` (interpreted as level)
-
-If `task_config` is omitted, the server falls back to an internal counter (fine for ad-hoc local testing, **not recommended** for fairness across agents).
 
 ---
 
