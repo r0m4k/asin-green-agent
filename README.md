@@ -1,191 +1,84 @@
-# ASIN Green Agent (AgentBeats Benchmark)
+# ASIN (Assessment of Spatial Intelligence for Navigation)
 
-ASIN (Assessment of Spatial Intelligence for Navigation) is a **Green Agent (evaluator)** for AgentBeats. It evaluates a Purple agent’s ability to navigate in **Manhattan, NYC** using:
+**ASIN** is a *green-agent benchmark* for **AgentBeats / AgentX** that evaluates a *purple agent’s* ability to perform real-world navigation in **Manhattan, NYC** using two complementary visual modalities:
 
-- a **2D map** (static map image with the target route + waypoint markers)
-- a **Street View image** (first-person view at the agent’s current location/heading)
+- A **static 2D route map**
+- A **first-person Street View image**
 
-The Purple agent must issue navigation actions (`f`, `l <deg>`, `r <deg>`, `q`) and is scored on how well it follows the route and how close it finishes to the destination.
-
----
-
-## What this benchmark tests
-
-- **Visual grounding**: align Street View with the 2D map geometry
-- **Spatial reasoning**: turn/move decisions from partial observations
-- **Planning / multi-step control**: recover from wrong turns under a step budget
+Each episode starts at **Point A** and asks the purple agent to navigate to the **final red marker** under a **bounded step budget**, producing:
+- a **final numeric score**, and  
+- a **visual overlay** comparing the walked path against the reference route.
 
 ---
 
-## Levels, determinism
+## Main Idea
 
-This benchmark has **10 levels** configured in `src/utils.py` (`LEVEL_CONFIG`).
+The core idea is to test whether an agent can reliably translate **visual observations** (map geometry + Street View perspective) into **sequential control decisions** that follow a target route and reach the goal—rather than solving a single-shot QA problem.
 
-- Each level has a target route length (meters) and a waypoint count.
-- The evaluator uses a deterministic seed per level:
-  - `seed = 1000 + level`
-- The **evaluation route polyline is truncated** to match `LEVEL_CONFIG[level]["dist"]` **exactly** (so Level distances align by construction).
-
----
-
-## Scoring (high-level)
-
-Final score is computed from the walked path vs the reference route:
-
-- **Destination bonus**: +30 if within 50m of the destination
-- **Route similarity**: up to 70 based on average deviation to the route polyline
-- **Progress multiplier**: similarity is multiplied by estimated progress along the route
-- **Level weighting**: the per-task score is multiplied by `LEVEL_CONFIG[level]["weight"]`
-
-The response of `/result` includes both `raw_score` and `score` (weighted).
+Tasks are:
+- **Deterministic per level** (for fair comparison)
+- **Grounded in the real world** via **Google Maps APIs**
 
 ---
 
-## Safety limits (prevents infinite runs)
+## What the Benchmark Tests (High Level)
 
-The evaluator enforces a **per-level step limit** derived from the level distance and step size:
+ASIN evaluates **spatial intelligence for navigation**, including:
 
-- `STEP_SIZE_METERS = 15`
-- `max_steps = max(120, ceil(target_dist_m / STEP_SIZE_METERS) * 3)`
+- Aligning an **egocentric view** with a **top-down map**
+- Maintaining **orientation**
+- Planning **multi-step movements**
+- **Recovering from mistakes**
+- Knowing **when to stop**
 
-This keeps runs bounded while allowing recovery from mistakes on longer routes.
-
----
-
-## Requirements
-
-### Environment variables
-
-This benchmark requires a **Google Maps Platform API key**:
-
-- `GOOGLE_MAPS_API_KEY` (**required**)
-
-Do **not** hardcode keys into this repository.
-
-### Google APIs to enable (Google Cloud Console)
-
-Enable billing and enable these APIs for your project:
-
-- **Directions API** (used to generate routes)
-- **Maps Static API** (used to render the 2D map)
-- **Street View Static API** (used to render Street View images)
-
-If Directions API is not enabled (or your project only allows newer APIs), route generation will fail.
+The benchmark emphasizes **consistent progress toward the goal** and **adherence to the intended route**, rather than luck or single-step heuristics.
 
 ---
 
-## Run locally (Python)
+## What the Benchmark Tests (Low Level)
 
-From `ASIN-Green-Agent/`:
+At the low level, the purple agent must repeatedly select **one control command per step**, balancing heading changes and forward motion under a strict budget.
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+Specifically, the benchmark probes whether the agent can:
 
-export GOOGLE_MAPS_API_KEY="YOUR_GOOGLE_MAPS_KEY"
-python -m src.server --host 0.0.0.0 --port 9009
-```
+1. Infer **heading and local topology** from Street View  
+2. Map that inference onto the **2D route geometry**  
+3. Execute **correct turns and forward moves** at the right times  
+4. **Terminate near the destination**
 
-Server will run at `http://localhost:9009`.
+Performance is evaluated from the **full trajectory** (walked path) relative to the **reference polyline**, not just the final location.
 
 ---
 
-## Run locally (Docker)
+## What Is Given to Solve Each Task
 
-From `ASIN-Green-Agent/`:
+At the start of each task, the agent receives:
 
-```bash
-docker build -t asin-green-agent:local .
-docker run --rm \
-  -p 9009:9009 \
-  -e GOOGLE_MAPS_API_KEY="YOUR_GOOGLE_MAPS_KEY" \
-  asin-green-agent:local --host 0.0.0.0 --port 9009
-```
+- A short **instruction prompt**
+- A **2D static map** visualizing:
+  - the reference route polyline
+  - labeled waypoint markers (`A … final`)
+- A **Street View image** showing the agent’s current location and facing direction
 
----
-
-## API contract (local compatibility endpoints)
-
-The server exposes these HTTP endpoints (POST JSON):
-
-### `POST /start`
-
-Request:
-
-```json
-{
-  "session_id": "any-unique-string",
-  "task_config": {"level": 1}
-}
-```
-
-Response:
-- `done`: boolean
-- `prompt`: instruction text
-- `images`: `[map_b64, streetview_b64]` (base64 PNG/JPEG bytes)
-- `info.level`: selected level (when available)
-
-### `POST /act`
-
-Request:
-
-```json
-{
-  "session_id": "same-as-start",
-  "action": "f"
-}
-```
-
-Valid actions:
-- `f` (move forward 15m)
-- `l <deg>` (turn left)
-- `r <deg>` (turn right)
-- `q` (finish)
-
-Response includes updated `images` and `done`.
-
-### `POST /result`
-
-Request:
-
-```json
-{
-  "session_id": "same-as-start"
-}
-```
-
-Response includes:
-- `score` (weighted)
-- `raw_score`
-- `level`, `weight`
-- `destination_reached`
-- `distance_to_target`
-- `avg_deviation`
-- `final_map_b64`
+On subsequent steps:
+- The agent receives **updated Street View images** as its pose changes
+- The **route map remains fixed** as reference context for that level
 
 ---
 
-## Troubleshooting
+## Action Space
 
-### `REQUEST_DENIED` / “API not enabled”
-- Verify billing is enabled
-- Verify the APIs are enabled (Directions, Maps Static, Street View Static)
-- Verify your API key restrictions allow server-side usage
+The agent must respond with **exactly one** of the following commands per step:
 
-### Not reproducible across runs
-- Always pass `task_config` (e.g., `{"level": 1}` or `"0".."9"`) to avoid relying on internal counters.
+- `f` — move forward **15 m**
+- `l <deg>` — turn left by `<deg>` degrees
+- `r <deg>` — turn right by `<deg>` degrees
+- `q` — finish the episode
 
----
+The episode ends when:
+- the agent issues `q`, or  
+- the step limit is exceeded
 
-## Submission notes (AgentBeats / AgentX)
-
-For competition submission, you generally need:
-
-- a public GitHub repo (this code)
-- a Docker image built from this directory and pushed to a registry
-- AgentBeats registration for the green agent
-- baseline purple agent(s) + a short demo video (per competition requirements)
-
-See the competition page: `https://rdi.berkeley.edu/agentx-agentbeats`
-
+The benchmark then returns:
+- a **final score**
+- a **map overlay** comparing the taken path to the target route
