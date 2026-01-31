@@ -1,4 +1,4 @@
-# ASIN (Assessment of Spatial Intelligence for Navigation)
+# ASIN (Assessment of Spatial Intelligence)
 
 **ASIN** is a *green-agent benchmark* for **AgentBeats / AgentX** that evaluates a *purple agent’s* ability to perform real-world navigation in **Manhattan, NYC** using two complementary visual modalities:
 
