@@ -80,24 +80,35 @@ class ASINGreenA2AAgent:
         prompt_text: str,
         map_b64: str,
         view_b64: str,
+        *,
+        include_map: bool = True,
     ) -> str:
         client = await self._get_client(navigator_endpoint)
 
-        parts = [
-            Part(root=TextPart(text=prompt_text)),
-            Part(
-                root=FilePart(
-                    file=FileWithBytes(bytes=map_b64, mime_type="image/png", name="map.png")
+        parts: list[Part] = [Part(root=TextPart(text=prompt_text))]
+
+        # Send the route map only once per level/task (first step).
+        if include_map:
+            parts.append(
+                Part(
+                    root=FilePart(
+                        file=FileWithBytes(
+                            bytes=map_b64, mime_type="image/png", name="map.png"
+                        )
+                    )
                 )
-            ),
+            )
+
+        # Always send the current Street View.
+        parts.append(
             Part(
                 root=FilePart(
                     file=FileWithBytes(
                         bytes=view_b64, mime_type="image/jpeg", name="street_view.jpg"
                     )
                 )
-            ),
-        ]
+            )
+        )
 
         params = MessageSendParams(
             message=Message(
@@ -178,7 +189,13 @@ class ASINGreenA2AAgent:
                 map_b64 = imgs[0] if len(imgs) > 0 else self.env.logic._placeholder_png_b64(640, 640, "Map missing")
                 view_b64 = imgs[1] if len(imgs) > 1 else self.env.logic._placeholder_png_b64(640, 400, "View missing")
 
-                action = await self._ask_navigator(navigator_endpoint, prompt_text, map_b64, view_b64)
+                action = await self._ask_navigator(
+                    navigator_endpoint,
+                    prompt_text,
+                    map_b64,
+                    view_b64,
+                    include_map=(step_guard == 1),
+                )
                 state = self.env.act(session_id, action)
 
                 # Avoid tight loops; deterministic small delay for network stability
