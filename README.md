@@ -13,7 +13,7 @@ Each episode starts at **Point A** and asks the purple agent to navigate to the 
 
 ## Main Idea
 
-The core idea is to test whether an agent can reliably translate **visual observations** (map geometry + Street View perspective) into **sequential control decisions** that follow a target route and reach the goal—rather than solving a single-shot QA problem.
+The core idea is to test whether an agent can reliably translate **visual observations** (map geometry [2D] + Street View perspective [3D]) into **sequential control decisions** that follow a target route and reach the goal.
 
 Tasks are:
 - **Deterministic per level** (for fair comparison)
@@ -23,8 +23,9 @@ Tasks are:
 
 ## What the Benchmark Tests (High Level)
 
-ASIN evaluates **spatial intelligence for navigation**, including:
+ASIN evaluates **spatial intelligence**, including:
 
+- Ability to map 2D to 3D and vice versa.
 - Aligning an **egocentric view** with a **top-down map**
 - Maintaining **orientation**
 - Planning **multi-step movements**
